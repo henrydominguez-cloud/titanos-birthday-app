@@ -1,0 +1,19 @@
+# Go
+app/bin/
+*.out
+coverage.*
+
+# Local tooling
+.DS_Store
+*.log
+
+# Helm
+*.tgz
+charts/
+
+# Editor
+.idea/
+.vscode/
+
+# Private prep material — NOT part of the submission
+docs/walkthrough.html

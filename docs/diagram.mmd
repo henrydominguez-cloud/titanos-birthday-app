@@ -1,40 +1,40 @@
 flowchart TB
     user([Clients / Internet])
 
-    subgraph edge[Edge and DNS]
+    subgraph edge["Edge and DNS"]
         r53[Route 53<br/>DNS + health checks]
         acm[ACM<br/>TLS certificates]
         waf[AWS WAF<br/>OWASP + rate rules]
     end
 
-    subgraph awsregion[AWS Region]
+    subgraph awsregion["AWS Region"]
         alb[Application Load Balancer<br/>public subnets - 3 AZs]
 
-        subgraph vpc[VPC - private subnets across 3 AZs]
-            subgraph eks[EKS Cluster - managed control plane]
-                subgraph kong[Kong Ingress Controller]
+        subgraph vpc["VPC - private subnets across 3 AZs"]
+            subgraph eks["EKS Cluster - managed control plane"]
+                subgraph kong["Kong Ingress Controller"]
                     kproxy[Kong proxy pods<br/>routing - rate limiting - auth]
                 end
-                subgraph app[birthday-app namespace]
+                subgraph app["birthday-app namespace"]
                     pods[Deployment - N pods<br/>HPA 3..20<br/>PodDisruptionBudget<br/>spread across AZs]
                 end
                 addons[Cluster Autoscaler / Karpenter<br/>External Secrets Operator<br/>metrics-server]
             end
         end
 
-        subgraph data[Data - private isolated subnets]
+        subgraph data["Data - private isolated subnets"]
             aurora[(Aurora PostgreSQL<br/>Multi-AZ writer + read replicas)]
             redis[(ElastiCache Redis<br/>Kong rate-limit counters)]
         end
 
-        subgraph platform[Platform services]
+        subgraph platform["Platform services"]
             ecr[ECR<br/>container images]
             secrets[Secrets Manager<br/>DB credentials]
             cw[CloudWatch + Prometheus/Grafana<br/>logs - metrics - traces]
         end
     end
 
-    subgraph cicd[CI/CD]
+    subgraph cicd["CI/CD"]
         gha[GitHub Actions<br/>test - build - scan]
         argo[Argo CD / Helm<br/>GitOps deploy]
     end

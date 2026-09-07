@@ -1,0 +1,111 @@
+# Default values for birthday-app.
+# Override per-environment with `-f values-<env>.yaml`.
+
+replicaCount: 2
+
+image:
+  repository: birthday-app
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Application configuration
+# ---------------------------------------------------------------------------
+app:
+  # "postgres" (default) or "memory" (zero-dependency demo mode).
+  storeBackend: postgres
+  port: 8080
+  logLevel: info
+
+# ---------------------------------------------------------------------------
+# Database connection.
+#   - Local/dev: the in-chart PostgreSQL below provides DATABASE_URL.
+#   - Production: set postgresql.enabled=false and point to RDS/Aurora using an
+#     EXISTING secret (never commit real credentials to values.yaml).
+# ---------------------------------------------------------------------------
+database:
+  # If set, the DATABASE_URL is read from this pre-existing secret/key instead
+  # of being rendered from the values below (recommended for production).
+  existingSecret: ""
+  existingSecretKey: "DATABASE_URL"
+  # Used only when existingSecret is empty (local/dev).
+  host: ""            # defaults to the in-chart postgres service when empty
+  port: 5432
+  name: birthday
+  user: birthday
+  password: birthday  # DEV ONLY. Use existingSecret in production.
+  sslmode: disable
+
+# ---------------------------------------------------------------------------
+# In-chart PostgreSQL (self-contained StatefulSet for local kind/k3s demos).
+# Disable in production and use a managed database.
+# ---------------------------------------------------------------------------
+postgresql:
+  enabled: true
+  image: postgres:16-alpine
+  storage: 1Gi
+  storageClassName: ""  # empty = cluster default (kind's "standard")
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Deployment tuning
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+service:
+  type: ClusterIP
+  port: 80
+
+serviceAccount:
+  create: true
+  name: ""
+
+# ---------------------------------------------------------------------------
+# Kong ingress (https://github.com/Kong/kubernetes-ingress-controller).
+# The Kong Ingress Controller is installed separately (see kind/setup.sh); this
+# chart only creates the Ingress + KongPlugin routing rules.
+# ---------------------------------------------------------------------------
+kong:
+  enabled: true
+  ingressClassName: kong
+  host: birthday.local
+  path: /hello
+  # Rate limiting protects the API under high usage (KongPlugin CRD).
+  rateLimiting:
+    enabled: true
+    minute: 100
+    policy: local
+  annotations: {}
+
+# Run as non-root (the image already does) and don't allow privilege escalation.
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,96 @@
+{{- if and (eq .Values.app.storeBackend "postgres") .Values.postgresql.enabled -}}
+{{- /*
+Self-contained PostgreSQL for LOCAL/DEV clusters (kind, k3s, minikube).
+In production set postgresql.enabled=false and use RDS/Aurora via
+database.existingSecret. This keeps the demo dependency-free and offline-capable.
+*/ -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "birthday-app.postgresName" . }}
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  POSTGRES_DB: {{ .Values.database.name | quote }}
+  POSTGRES_USER: {{ .Values.database.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.database.password | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "birthday-app.postgresName" . }}
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "birthday-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  ports:
+    - name: postgres
+      port: {{ .Values.database.port }}
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "birthday-app.postgresName" . }}
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "birthday-app.postgresName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "birthday-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+  template:
+    metadata:
+      labels:
+        {{- include "birthday-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgresql
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70          # alpine postgres user
+        fsGroup: 70
+      containers:
+        - name: postgres
+          image: {{ .Values.postgresql.image }}
+          envFrom:
+            - secretRef:
+                name: {{ include "birthday-app.postgresName" . }}
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.database.port }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.database.user | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.database.user | quote }}]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgresql.storageClassName }}
+        storageClassName: {{ .Values.postgresql.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.storage }}
+{{- end }}

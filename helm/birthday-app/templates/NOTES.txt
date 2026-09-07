@@ -1,0 +1,24 @@
+birthday-app {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+
+1. Wait for the pods to become ready:
+   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "birthday-app.fullname" . }}
+
+{{- if .Values.kong.enabled }}
+
+2. Traffic enters through Kong at host "{{ .Values.kong.host }}", path "{{ .Values.kong.path }}".
+   From your machine (kind maps Kong's proxy to localhost:8000):
+
+   curl -i -X PUT http://localhost:8000/hello/jdoe \
+     -H "Host: {{ .Values.kong.host }}" -H "Content-Type: application/json" \
+     -d '{"dateOfBirth":"1990-09-10"}'
+
+   curl -s http://localhost:8000/hello/jdoe -H "Host: {{ .Values.kong.host }}"
+{{- else }}
+
+2. Port-forward the service:
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "birthday-app.fullname" . }} 8080:{{ .Values.service.port }}
+   curl -s http://localhost:8080/hello/jdoe
+{{- end }}
+
+3. Run the built-in smoke test:
+   helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

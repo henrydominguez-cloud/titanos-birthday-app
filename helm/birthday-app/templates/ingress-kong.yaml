@@ -1,0 +1,44 @@
+{{- if .Values.kong.enabled }}
+{{- if .Values.kong.rateLimiting.enabled }}
+# KongPlugin: per-consumer/route rate limiting to protect the API under load.
+# https://docs.konghq.com/hub/kong-inc/rate-limiting/
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ include "birthday-app.fullname" . }}-rate-limiting
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+plugin: rate-limiting
+config:
+  minute: {{ .Values.kong.rateLimiting.minute }}
+  policy: {{ .Values.kong.rateLimiting.policy }}
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "birthday-app.fullname" . }}
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+  annotations:
+    konghq.com/strip-path: "false"
+    {{- if .Values.kong.rateLimiting.enabled }}
+    konghq.com/plugins: {{ include "birthday-app.fullname" . }}-rate-limiting
+    {{- end }}
+    {{- with .Values.kong.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.kong.ingressClassName }}
+  rules:
+    - host: {{ .Values.kong.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.kong.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "birthday-app.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "birthday-app.fullname" . }}-test"
+  labels:
+    {{- include "birthday-app.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: api-test
+      image: curlimages/curl:8.10.1
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+          BASE="http://{{ include "birthday-app.fullname" . }}:{{ .Values.service.port }}"
+          echo "PUT /hello/testuser"
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/hello/testuser" \
+            -H 'Content-Type: application/json' -d '{"dateOfBirth":"1990-01-01"}')
+          [ "$code" = "204" ] || { echo "expected 204, got $code"; exit 1; }
+          echo "GET /hello/testuser"
+          body=$(curl -s "$BASE/hello/testuser")
+          echo "$body"
+          echo "$body" | grep -q "Hello, testuser" || { echo "unexpected body"; exit 1; }
+          echo "OK"

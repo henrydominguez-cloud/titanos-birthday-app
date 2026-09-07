@@ -1,0 +1,24 @@
+# kind cluster for the Titan OS take-home.
+# One control-plane + two workers so we can demonstrate replica spreading and
+# rolling updates. Kong's proxy (exposed as NodePort 30080/30443) is mapped to
+# localhost:8000 / localhost:8443 so the API is reachable from the host.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: titanos
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 30080   # Kong proxy HTTP  (NodePort)
+        hostPort: 8000
+        protocol: TCP
+      - containerPort: 30443   # Kong proxy HTTPS (NodePort)
+        hostPort: 8443
+        protocol: TCP
+  - role: worker
+  - role: worker
